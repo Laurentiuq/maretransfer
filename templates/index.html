@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Real-Time Inside Whisper Transcription</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Include the audio capture script -->
+    <script src="/static/audio-capture.js"></script>
+    
+    <style>
+        :root {
+            --primary-color: #4a90e2;
+            --error-color: #ff4444;
+            --success-color: #4caf50;
+            --text-color: #333;
+            --bg-color: #f5f5f5;
+        }
+
+        body { 
+            max-width: 800px; 
+            margin: 0 auto; 
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--primary-color);
+            margin-bottom: 30px;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+            justify-content: center;
+        }
+
+        button {
+            padding: 12px 24px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        #startButton {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        #stopButton {
+            background-color: var(--error-color);
+            color: white;
+        }
+
+        #startButton:hover:not(:disabled),
+        #stopButton:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        #status {
+            text-align: center;
+            margin: 15px 0;
+            font-weight: 500;
+            min-height: 24px;
+        }
+
+        #error {
+            color: var(--error-color);
+            text-align: center;
+            margin: 10px 0;
+            min-height: 24px;
+        }
+
+        #transcription {
+            width: 100%;
+            height: 300px;
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            line-height: 1.6;
+            resize: vertical;
+            font-family: inherit;
+        }
+
+        .recording-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            background-color: var(--error-color);
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.4; }
+            100% { opacity: 1; }
+        }
+
+        .keyboard-shortcuts {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎙️ Real-Time Whisper Transcription</h1>
+        
+        <div class="controls">
+            <button id="startButton" onclick="window.startRecording()">
+                <span class="recording-indicator" style="display: none;"></span>
+                Start Recording
+            </button>
+            <button id="stopButton" onclick="window.stopRecording()" disabled>
+                Stop Recording
+            </button>
+        </div>
+
+        <div id="status"></div>
+        <div id="error"></div>
+        
+        <textarea id="transcription" 
+                  readonly 
+                  placeholder="Your transcription will appear here..."></textarea>
+
+        <div class="keyboard-shortcuts">
+            Keyboard shortcuts: 
+            Start Recording (Ctrl/Cmd + Shift + R) | 
+            Stop Recording (Ctrl/Cmd + Shift + S)
+        </div>
+    </div>
+
+    <script>
+        
+        // Initialize status updates
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        const status = document.getElementById('status');
+        const error = document.getElementById('error');
+        const recordingIndicator = document.querySelector('.recording-indicator');
+
+        // Update UI when recording starts
+        const originalStartRecording = window.startRecording;
+        window.startRecording = async () => {
+            try {
+                error.textContent = '';
+                startButton.disabled = true;
+                stopButton.disabled = false;
+                status.textContent = 'Initializing recording...';
+                recordingIndicator.style.display = 'inline-block';
+                
+                await originalStartRecording();
+                
+                status.textContent = 'Recording in progress...';
+            } catch (e) {
+                error.textContent = `Error: ${e.message}`;
+                resetUI();
+            }
+        };
+
+        // Update UI when recording stops
+        const originalStopRecording = window.stopRecording;
+        window.stopRecording = () => {
+            try {
+                originalStopRecording();
+                resetUI();
+            } catch (e) {
+                error.textContent = `Error: ${e.message}`;
+                resetUI();
+            }
+        };
+
+        // Reset UI state
+        function resetUI() {
+            startButton.disabled = false;
+            stopButton.disabled = true;
+            status.textContent = 'Recording stopped';
+            recordingIndicator.style.display = 'none';
+        }
+
+        // Check browser compatibility
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            error.textContent = 'Your browser does not support audio recording';
+            startButton.disabled = true;
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (event) => {
+            if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'R') {
+                event.preventDefault();
+                if (!startButton.disabled) window.startRecording();
+            }
+            if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'S') {
+                event.preventDefault();
+                if (!stopButton.disabled) window.stopRecording();
+            }
+        });
+    </script>
+</body>
+</html>
